@@ -1,0 +1,6 @@
+id=ksu-cloud-installer
+name=KSU Cloud Installer
+version=1.0.0
+versionCode=1
+author=junxihan921-lab
+description=KernelSU 云端模块自动安装器
