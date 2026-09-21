@@ -8,14 +8,16 @@ TMP="$MODDIR/modules.json"
 CACHE="$MODDIR/cache"
 
 DEFAULT_REPO_URL="https://raw.githubusercontent.com/junxihan921-lab/ksu-module-repo/main/modules.json"
+
 REPO_URL="$DEFAULT_REPO_URL"
 AUTO_INSTALL="true"
-CHECK_DELAY="30"
+CHECK_DELAY="0"
 
 mkdir -p "$CACHE"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"
+    MSG="$*"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $MSG" >> "$LOG"
 }
 
 # 读取配置
@@ -41,12 +43,11 @@ log "启动云端模块检查"
 log "================================"
 
 if [ "$AUTO_INSTALL" != "true" ]; then
-    log "AUTO_INSTALL=false，跳过自动安装"
+    log "AUTO_INSTALL=false，跳过"
     exit 0
 fi
 
-# 等待网络
-if [ -n "$CHECK_DELAY" ] && [ "$CHECK_DELAY" -gt 0 ] 2>/dev/null; then
+if [ "$CHECK_DELAY" -gt 0 ] 2>/dev/null; then
     sleep "$CHECK_DELAY"
 fi
 
@@ -65,23 +66,28 @@ fi
 log "下载工具: $DOWNLOAD"
 log "云端地址: $REPO_URL"
 
-# 下载函数
 download_file() {
     URL="$1"
     OUT="$2"
 
     if [ "$DOWNLOAD" = "curl" ]; then
-        curl -L --fail --silent --show-error \
+        curl -L \
+            --fail \
+            --silent \
+            --show-error \
             --connect-timeout 15 \
             --max-time 300 \
-            -o "$OUT" "$URL"
+            -o "$OUT" \
+            "$URL"
     else
         wget -q -O "$OUT" "$URL"
     fi
 }
 
-# 下载 modules.json
+# 下载 JSON
 rm -f "$TMP"
+
+log "开始下载 modules.json"
 
 if ! download_file "$REPO_URL" "$TMP"; then
     log "ERROR: modules.json 下载失败"
@@ -90,44 +96,71 @@ fi
 
 if [ ! -s "$TMP" ]; then
     log "ERROR: modules.json 为空"
-    rm -f "$TMP"
     exit 1
 fi
 
 log "modules.json 下载成功"
 
-# 当前云端 JSON 的简单解析
-# 每个模块对象一行/连续字段时提取 id/name/url
-extract_modules() {
-    sed 's/[{}]/\n/g' "$TMP" |
-    sed 's/],/]\n/g' |
-    grep '"id"' |
-    while IFS= read -r LINE; do
-
-        ID=$(echo "$LINE" |
-            sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-
-        NAME=$(echo "$LINE" |
-            sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-
-        URL=$(echo "$LINE" |
-            sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-
-        if [ -n "$ID" ] && [ -n "$URL" ]; then
-            echo "$ID|$NAME|$URL"
-        fi
-    done
-}
+# ------------------------------------------------
+# 解析 JSON
+#
+# 适配这种格式：
+#
+# {
+#   "modules": [
+#     {
+#       "id": "game_optimizer",
+#       "name": "游戏优化助手",
+#       "version": "1.0.0",
+#       "url": "https://...",
+#       "sha256": ""
+#     }
+#   ]
+# }
+# ------------------------------------------------
 
 MODULE_LIST="$CACHE/module_list.txt"
 rm -f "$MODULE_LIST"
 
-extract_modules > "$MODULE_LIST"
+awk '
+BEGIN {
+    id=""
+    name=""
+    url=""
+}
+
+/"id"[[:space:]]*:/ {
+    line=$0
+    sub(/^.*"id"[[:space:]]*:[[:space:]]*"/, "", line)
+    sub(/".*$/, "", line)
+    id=line
+}
+
+/"name"[[:space:]]*:/ {
+    line=$0
+    sub(/^.*"name"[[:space:]]*:[[:space:]]*"/, "", line)
+    sub(/".*$/, "", line)
+    name=line
+}
+
+/"url"[[:space:]]*:/ {
+    line=$0
+    sub(/^.*"url"[[:space:]]*:[[:space:]]*"/, "", line)
+    sub(/".*$/, "", line)
+    url=line
+
+    if (id != "" && url != "") {
+        print id "|" name "|" url
+        id=""
+        name=""
+        url=""
+    }
+}
+' "$TMP" > "$MODULE_LIST"
 
 if [ ! -s "$MODULE_LIST" ]; then
     log "ERROR: 没有解析到任何云端模块"
-    log "请检查 modules.json 格式"
-    rm -f "$TMP"
+    log "请检查 modules.json"
     exit 1
 fi
 
@@ -153,40 +186,53 @@ while IFS='|' read -r ID NAME URL; do
 
     if ! download_file "$URL" "$ZIP"; then
         log "ERROR: 模块下载失败: $NAME"
-        rm -f "$ZIP"
         continue
     fi
 
     if [ ! -s "$ZIP" ]; then
-        log "ERROR: 下载文件为空: $NAME"
+        log "ERROR: ZIP 文件为空: $NAME"
         rm -f "$ZIP"
         continue
     fi
 
     log "模块下载成功: $NAME"
+    log "ZIP 大小: $(wc -c < "$ZIP") bytes"
 
-        log "开始安装模块..."
+    # 检查 ksud
+    KSUD=""
 
     if command -v ksud >/dev/null 2>&1; then
-
-        if ksud module install "$ZIP" >> "$LOG" 2>&1; then
-            log "模块安装成功: $NAME"
-        else
-            log "模块安装失败: $NAME"
-        fi
-
-    elif [ -x /data/adb/ksud ]; then
-
-        if /data/adb/ksud module install "$ZIP" >> "$LOG" 2>&1; then
-            log "模块安装成功: $NAME"
-        else
-            log "模块安装失败: $NAME"
-        fi
-
-    else
-        log "ERROR: 找不到 ksud"
+        KSUD="ksud"
+    elif [ -x "/data/adb/ksud" ]; then
+        KSUD="/data/adb/ksud"
     fi
 
-    rm -f "$ZIP"
+    if [ -z "$KSUD" ]; then
+        log "ERROR: 找不到 ksud"
+        continue
+    fi
+
+    log "找到 ksud: $KSUD"
+    log "开始安装: $NAME"
+
+    "$KSUD" module install "$ZIP" >> "$LOG" 2>&1
+    RESULT=$?
+
+    if [ "$RESULT" -eq 0 ]; then
+        log "模块安装成功: $NAME"
+        rm -f "$ZIP"
+    else
+        log "ERROR: 模块安装失败: $NAME"
+        log "ksud 返回码: $RESULT"
+    fi
 
 done < "$MODULE_LIST"
+
+rm -f "$TMP"
+
+log "================================"
+log "本次发现模块: $COUNT"
+log "KSU Cloud Installer 完成"
+log "================================"
+
+exit 0
