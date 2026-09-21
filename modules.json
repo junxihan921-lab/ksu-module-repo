@@ -1,4 +1,12 @@
 {
   "version": 1,
-  "modules": []
+  "modules": [
+    {
+      "id": "game_optimizer",
+      "name": "游戏优化助手",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/junxihan921-lab/ksu-module-repo/main/modules/3.Tenc%F0%9F%8E%AE%20%E6%B8%B8%E6%88%8F%E4%BC%98%E5%8C%96%E5%8A%A9%E6%89%8B.zip",
+      "sha256": ""
+    }
+  ]
 }
