@@ -165,27 +165,28 @@ while IFS='|' read -r ID NAME URL; do
 
     log "模块下载成功: $NAME"
 
-    # 当前版本先保存下载包
-    # 不直接把 ZIP 解压到 /data/adb/modules
-    #
-    # KernelSU 官方模块本身是 ZIP 安装包，
-    # 但官方文档没有确认 ksud module install 作为通用安装接口。
-    #
-    # 因此这里先完成可靠下载，避免错误调用未知命令。
+        log "开始安装模块..."
 
-    FINAL="$CACHE/${ID}.zip"
+    if command -v ksud >/dev/null 2>&1; then
 
-    if [ -f "$FINAL" ]; then
-        log "模块包已保存: $FINAL"
+        if ksud module install "$ZIP" >> "$LOG" 2>&1; then
+            log "模块安装成功: $NAME"
+        else
+            log "模块安装失败: $NAME"
+        fi
+
+    elif [ -x /data/adb/ksud ]; then
+
+        if /data/adb/ksud module install "$ZIP" >> "$LOG" 2>&1; then
+            log "模块安装成功: $NAME"
+        else
+            log "模块安装失败: $NAME"
+        fi
+
+    else
+        log "ERROR: 找不到 ksud"
     fi
 
+    rm -f "$ZIP"
+
 done < "$MODULE_LIST"
-
-rm -f "$TMP"
-
-log "--------------------------------"
-log "云端模块数量: $COUNT"
-log "云端检查完成"
-log "================================"
-
-exit 0
