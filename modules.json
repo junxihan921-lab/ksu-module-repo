@@ -7,6 +7,27 @@
       "version": "1.0.0",
       "url": "https://cdn.jsdelivr.net/gh/junxihan921-lab/ksu-module-repo@main/modules/3.Tenc%F0%9F%8E%AE%20%E6%B8%B8%E6%88%8F%E4%BC%98%E5%8C%96%E5%8A%A9%E6%89%8B.zip",
       "sha256": ""
+    },
+    {
+      "id": "tee_simulator",
+      "name": "TEE Simulator",
+      "version": "4.0-34",
+      "url": "https://cdn.jsdelivr.net/gh/junxihan921-lab/ksu-module-repo@main/modules/TEESimulator-v4.0-34-Release.zip",
+      "sha256": ""
+    },
+    {
+      "id": "play_integrity_fix",
+      "name": "Play Integrity Fix",
+      "version": "4.7.1",
+      "url": "https://cdn.jsdelivr.net/gh/junxihan921-lab/ksu-module-repo@main/modules/Play%20Integrity%20FixV4.7.1.zip",
+      "sha256": ""
+    },
+    {
+      "id": "hma",
+      "name": "HMA",
+      "version": "1.0.0",
+      "url": "https://cdn.jsdelivr.net/gh/junxihan921-lab/ksu-module-repo@main/modules/HMA.zip",
+      "sha256": ""
     }
   ]
 }
