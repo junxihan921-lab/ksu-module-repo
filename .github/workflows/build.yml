@@ -1,0 +1,36 @@
+name: Build KSU Module
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ksu-cloud-installer/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build module ZIP
+        run: |
+          mkdir -p build
+
+          cd ksu-cloud-installer
+
+          zip -r ../build/ksu-cloud-installer.zip . \
+            -x "*.git*" \
+            -x "install.log" \
+            -x "cache/*"
+
+          cd ..
+
+          unzip -l build/ksu-cloud-installer.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ksu-cloud-installer
+          path: build/ksu-cloud-installer.zip
